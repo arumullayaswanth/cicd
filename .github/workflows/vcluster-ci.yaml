@@ -3,7 +3,17 @@ name: vCluster CI Pipeline
 on:
   push:
     branches:
-      - master
+      - main
+  workflow_dispatch:
+    inputs:
+      delete_app:
+        description: "Delete the application after tests?"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 jobs:
   kubernetes-test:
@@ -50,6 +60,11 @@ jobs:
       - name: Run Tests
         run: |
           kubectl rollout status deployment/demo-app
+
+      - name: Delete Application
+        if: ${{ github.event.inputs.delete_app == 'true' }}
+        run: |
+          kubectl delete -f k8s/deployment.yaml
 
       - name: Delete Cluster
         run: |
