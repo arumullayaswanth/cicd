@@ -11,56 +11,80 @@ jobs:
 
     steps:
 
+      # Checkout repository
       - name: Checkout Repository
         uses: actions/checkout@v3
 
+      # Install kubectl
       - name: Install kubectl
         run: |
           curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
 
+      # Install vCluster CLI
       - name: Install vCluster CLI
         run: |
           curl -L https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64 -o vcluster
           chmod +x vcluster
           sudo mv vcluster /usr/local/bin/
 
+      # Enable Docker driver for vCluster
       - name: Enable Docker Driver
         run: |
           vcluster use driver docker
 
+      # Load required kernel modules for Kubernetes networking
+      - name: Load Kernel Modules
+        run: |
+          sudo modprobe overlay || true
+          sudo modprobe bridge || true
+          sudo modprobe br_netfilter || true
+
+      # Create and connect to vCluster
       - name: Create vCluster
         run: |
           vcluster create ci-cluster --driver docker
+          vcluster connect ci-cluster
 
+      # Verify cluster status
       - name: Verify Cluster
         run: |
-          kubectl get nodes
           kubectl cluster-info
+          kubectl get nodes
+          kubectl get pods -A
 
+      # Deploy Kubernetes application
       - name: Deploy Application
         run: |
           kubectl apply -f k8s/deployment.yaml
 
+      # Verify pods
       - name: Verify Pods
         run: |
           kubectl get pods
 
+      # Wait for deployment rollout
       - name: Wait for Pods
         run: |
-          kubectl wait --for=condition=ready pod -l app=demo --timeout=180s
+          kubectl rollout status deployment/demo-app --timeout=180s
 
+      # Run simple test
       - name: Run Tests
         run: |
-          kubectl rollout status deployment/demo-app
+          kubectl get deployments
+          kubectl get pods
 
+      # Debug if something fails
       - name: Debug Pods
         if: failure()
         run: |
+          kubectl get nodes
           kubectl get pods -A
           kubectl describe pods
+          kubectl get events --sort-by=.metadata.creationTimestamp
 
+      # Delete cluster after CI
       - name: Delete Cluster
         if: always()
         run: |
