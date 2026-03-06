@@ -80,6 +80,13 @@ jobs:
         run: |
           kubectl get svc
 
+      # Show application URL
+      - name: Show Application URL
+        run: |
+          echo "Application URL:"
+          kubectl get svc demo-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+          echo ""
+
       # Debug if something fails
       - name: Debug Pods
         if: failure()
