@@ -11,69 +11,57 @@ jobs:
 
     steps:
 
-      # Checkout repository code
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # Install kubectl (Kubernetes CLI)
       - name: Install kubectl
         run: |
           curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
 
-      # Install vCluster CLI
       - name: Install vCluster CLI
         run: |
           curl -L https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64 -o vcluster
           chmod +x vcluster
           sudo mv vcluster /usr/local/bin/
 
-      # Enable Docker driver
       - name: Enable Docker Driver
         run: |
           vcluster use driver docker
 
-      # Create virtual Kubernetes cluster (FIXED)
       - name: Create vCluster
         run: |
-          vcluster create ci-cluster --driver docker --connect=false
+          vcluster create ci-cluster --driver docker --standalone
           vcluster connect ci-cluster
 
-      # Verify cluster nodes
       - name: Verify Cluster
         run: |
           kubectl get nodes
           kubectl cluster-info
 
-      # Deploy Kubernetes application
       - name: Deploy Application
         run: |
           kubectl apply -f k8s/deployment.yaml
 
-      # Check pod status
       - name: Verify Pods
         run: |
           kubectl get pods
 
-      # Wait until pods become ready
       - name: Wait for Pods
         run: |
           kubectl wait --for=condition=ready pod -l app=demo --timeout=180s
 
-      # Verify rollout
       - name: Run Tests
         run: |
           kubectl rollout status deployment/demo-app
 
-      # Debug info if something fails
       - name: Debug Pods
         if: failure()
         run: |
           kubectl get pods -A
           kubectl describe pods
 
-      # Delete cluster after tests
       - name: Delete Cluster
         if: always()
         run: |
