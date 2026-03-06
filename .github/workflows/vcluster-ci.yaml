@@ -29,21 +29,22 @@ jobs:
           chmod +x vcluster
           sudo mv vcluster /usr/local/bin/
 
-      # Enable Docker driver for running vCluster locally
+      # Enable Docker driver
       - name: Enable Docker Driver
         run: |
           vcluster use driver docker
 
-      # Create virtual Kubernetes cluster
+      # Create virtual Kubernetes cluster (FIXED)
       - name: Create vCluster
         run: |
-          vcluster create ci-cluster --connect=false
+          vcluster create ci-cluster --driver docker --connect=false
           vcluster connect ci-cluster
 
       # Verify cluster nodes
       - name: Verify Cluster
         run: |
           kubectl get nodes
+          kubectl cluster-info
 
       # Deploy Kubernetes application
       - name: Deploy Application
@@ -60,7 +61,7 @@ jobs:
         run: |
           kubectl wait --for=condition=ready pod -l app=demo --timeout=180s
 
-      # Run deployment rollout test
+      # Verify rollout
       - name: Run Tests
         run: |
           kubectl rollout status deployment/demo-app
@@ -69,7 +70,7 @@ jobs:
       - name: Debug Pods
         if: failure()
         run: |
-          kubectl get pods
+          kubectl get pods -A
           kubectl describe pods
 
       # Delete cluster after tests
