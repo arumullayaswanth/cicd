@@ -1,77 +1,79 @@
-# Name of the GitHub Actions workflow
 name: vCluster CI Pipeline
 
-# Trigger the workflow when code is pushed to the main branch
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   kubernetes-test:
-    # Use the latest Ubuntu runner provided by GitHub
     runs-on: ubuntu-latest
 
     steps:
 
-      # Step 1: Checkout the repository code so the workflow can access it
+      # Checkout repository code
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # Step 2: Install kubectl (Kubernetes command-line tool)
-      # Used to interact with Kubernetes clusters
+      # Install kubectl (Kubernetes CLI)
       - name: Install kubectl
         run: |
           curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
 
-      # Step 3: Install vCluster CLI
-      # vCluster allows running a virtual Kubernetes cluster inside another cluster or environment
+      # Install vCluster CLI
       - name: Install vCluster CLI
         run: |
           curl -L https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64 -o vcluster
           chmod +x vcluster
           sudo mv vcluster /usr/local/bin/
 
-      # Step 4: Enable Docker driver
-      # This allows vCluster to run using Docker as the container runtime
+      # Enable Docker driver for running vCluster locally
       - name: Enable Docker Driver
         run: |
           vcluster use driver docker
 
-      # Step 5: Create a virtual Kubernetes cluster named "ci-cluster"
-      # Then connect kubectl to that cluster
+      # Create virtual Kubernetes cluster
       - name: Create vCluster
         run: |
           vcluster create ci-cluster --connect=false
           vcluster connect ci-cluster
 
-      # Step 6: Verify that the cluster is running
-      # This command lists the nodes available in the cluster
+      # Verify cluster nodes
       - name: Verify Cluster
         run: |
           kubectl get nodes
 
-      # Step 7: Deploy the Kubernetes application
-      # Applies the deployment.yaml file from the k8s directory
+      # Deploy Kubernetes application
       - name: Deploy Application
         run: |
           kubectl apply -f k8s/deployment.yaml
 
-      # Step 8: Verify that pods are created successfully
+      # Check pod status
       - name: Verify Pods
         run: |
           kubectl get pods
 
-      # Step 9: Run tests by checking rollout status of the deployment
-      # Ensures the application is successfully deployed and running
+      # Wait until pods become ready
+      - name: Wait for Pods
+        run: |
+          kubectl wait --for=condition=ready pod -l app=demo --timeout=180s
+
+      # Run deployment rollout test
       - name: Run Tests
         run: |
           kubectl rollout status deployment/demo-app
 
-      # Step 10: Delete the virtual cluster after tests are completed
-      # Cleans up resources used during CI
+      # Debug info if something fails
+      - name: Debug Pods
+        if: failure()
+        run: |
+          kubectl get pods
+          kubectl describe pods
+
+      # Delete cluster after tests
       - name: Delete Cluster
+        if: always()
         run: |
           vcluster delete ci-cluster
