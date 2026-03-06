@@ -29,12 +29,12 @@ jobs:
           chmod +x vcluster
           sudo mv vcluster /usr/local/bin/
 
-      # Enable Docker driver for vCluster
+      # Enable Docker driver
       - name: Enable Docker Driver
         run: |
           vcluster use driver docker
 
-      # Load required kernel modules for Kubernetes networking
+      # Load required kernel modules
       - name: Load Kernel Modules
         run: |
           sudo modprobe overlay || true
@@ -47,17 +47,22 @@ jobs:
           vcluster create ci-cluster --driver docker
           vcluster connect ci-cluster
 
-      # Verify cluster status
+      # Verify cluster
       - name: Verify Cluster
         run: |
           kubectl cluster-info
           kubectl get nodes
           kubectl get pods -A
 
-      # Deploy Kubernetes application
+      # Deploy application
       - name: Deploy Application
         run: |
           kubectl apply -f k8s/deployment.yaml
+
+      # Deploy LoadBalancer service
+      - name: Deploy Service
+        run: |
+          kubectl apply -f k8s/service.yaml
 
       # Verify pods
       - name: Verify Pods
@@ -69,13 +74,24 @@ jobs:
         run: |
           kubectl rollout status deployment/demo-app --timeout=180s
 
-      # Run simple test
+      # Show service details
+      - name: Show Service
+        run: |
+          kubectl get svc
+
+      # Print application URL
+      - name: Show Application URL
+        run: |
+          echo "Application URL:"
+          kubectl get svc demo-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+
+      # Run simple tests
       - name: Run Tests
         run: |
           kubectl get deployments
           kubectl get pods
 
-      # Debug if something fails
+      # Debug if failure occurs
       - name: Debug Pods
         if: failure()
         run: |
@@ -84,7 +100,7 @@ jobs:
           kubectl describe pods
           kubectl get events --sort-by=.metadata.creationTimestamp
 
-      # Delete cluster after CI
+      # Delete cluster
       - name: Delete Cluster
         if: always()
         run: |
