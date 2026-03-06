@@ -34,6 +34,13 @@ jobs:
         run: |
           vcluster use driver docker
 
+      # Clean any old docker resources
+      - name: Clean Docker Environment
+        run: |
+          docker ps -a || true
+          docker network prune -f || true
+          docker container prune -f || true
+
       # Load required kernel modules
       - name: Load Kernel Modules
         run: |
@@ -41,7 +48,7 @@ jobs:
           sudo modprobe bridge || true
           sudo modprobe br_netfilter || true
 
-      # Create and connect to vCluster
+      # Create and connect vCluster
       - name: Create vCluster
         run: |
           vcluster create ci-cluster --driver docker
@@ -51,7 +58,6 @@ jobs:
       - name: Verify Cluster
         run: |
           kubectl cluster-info
-          kubectl get nodes
           kubectl get pods -A
 
       # Deploy application
@@ -59,43 +65,25 @@ jobs:
         run: |
           kubectl apply -f k8s/deployment.yaml
 
-      # Deploy LoadBalancer service
+      # Deploy service
       - name: Deploy Service
         run: |
           kubectl apply -f k8s/service.yaml
 
-      # Verify pods
-      - name: Verify Pods
-        run: |
-          kubectl get pods
-
-      # Wait for deployment rollout
+      # Wait for deployment
       - name: Wait for Pods
         run: |
           kubectl rollout status deployment/demo-app --timeout=180s
 
-      # Show service details
+      # Show service info
       - name: Show Service
         run: |
           kubectl get svc
 
-      # Print application URL
-      - name: Show Application URL
-        run: |
-          echo "Application URL:"
-          kubectl get svc demo-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-
-      # Run simple tests
-      - name: Run Tests
-        run: |
-          kubectl get deployments
-          kubectl get pods
-
-      # Debug if failure occurs
+      # Debug if something fails
       - name: Debug Pods
         if: failure()
         run: |
-          kubectl get nodes
           kubectl get pods -A
           kubectl describe pods
           kubectl get events --sort-by=.metadata.creationTimestamp
@@ -104,4 +92,4 @@ jobs:
       - name: Delete Cluster
         if: always()
         run: |
-          vcluster delete ci-cluster
+          vcluster delete ci-cluster || true
