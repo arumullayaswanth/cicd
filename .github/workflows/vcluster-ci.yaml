@@ -1,0 +1,56 @@
+name: vCluster CI Pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  kubernetes-test:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Install vCluster CLI
+        run: |
+          curl -L https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64 -o vcluster
+          chmod +x vcluster
+          sudo mv vcluster /usr/local/bin/
+
+      - name: Enable Docker Driver
+        run: |
+          vcluster use driver docker
+
+      - name: Create vCluster
+        run: |
+          vcluster create ci-cluster --connect=false
+          vcluster connect ci-cluster
+
+      - name: Verify Cluster
+        run: |
+          kubectl get nodes
+
+      - name: Deploy Application
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+
+      - name: Verify Pods
+        run: |
+          kubectl get pods
+
+      - name: Run Tests
+        run: |
+          kubectl rollout status deployment/demo-app
+
+      - name: Delete Cluster
+        run: |
+          vcluster delete ci-cluster
